@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: awsfox92/k-api-gateway:latest
+          command: ["sh", "-c", "uvicorn main:app --reload --host 0.0.0.0"]
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: gateway-env

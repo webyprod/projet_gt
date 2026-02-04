@@ -1,0 +1,4 @@
+apiVersion: v2
+name: my-project
+description: Helm chart pour projet datascientest
+version: 0.1.0
