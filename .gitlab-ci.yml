@@ -1,0 +1,113 @@
+stages:
+  - build
+  - push
+  - dev
+  - qa
+  - staging
+  - prod
+
+variables:
+  DOCKERHUB_USER: "awsfox92"
+  DOCKERHUB_IMAGE: "awsfox92/projet-gt"
+  IMAGE_TAG: "$CI_COMMIT_SHORT_SHA"
+  HELM_CHART_PATH: "charts/my-project"
+
+
+build:
+  stage: build
+  script:
+    - docker login -u "$DOCKERHUB_USER" -p "$DOCKERHUB_PASSWORD"
+    - docker compose up -d
+    - sleep 5
+    - docker compose ps
+    - docker compose down
+
+
+push:
+  stage: push
+  needs: ["build"]
+  script:
+    - docker login -u "$DOCKERHUB_USER" -p "$DOCKERHUB_PASSWORD"
+
+    # Build toutes les images définies dans docker-compose.yml
+    - docker compose build
+
+    # Tag SHA pour chaque image
+    - docker tag awsfox92/k-api-gateway:latest awsfox92/k-api-gateway:$CI_COMMIT_SHORT_SHA
+    - docker tag awsfox92/k-users:latest awsfox92/k-users:$CI_COMMIT_SHORT_SHA
+    - docker tag awsfox92/k-orders:latest awsfox92/k-orders:$CI_COMMIT_SHORT_SHA
+
+    # Push latest
+    - docker push awsfox92/k-api-gateway:latest
+    - docker push awsfox92/k-users:latest
+    - docker push awsfox92/k-orders:latest
+
+    # Push SHA
+    - docker push awsfox92/k-api-gateway:$CI_COMMIT_SHORT_SHA
+    - docker push awsfox92/k-users:$CI_COMMIT_SHORT_SHA
+    - docker push awsfox92/k-orders:$CI_COMMIT_SHORT_SHA
+
+
+
+dev:
+  stage: dev
+  needs:
+    - build
+    - push
+  script:
+    - mkdir -p ~/.kube
+    - echo "$KUBE_CONFIG" > ~/.kube/config
+    - chmod 600 ~/.kube/config
+    - export KUBECONFIG=~/.kube/config
+
+    - kubectl create namespace dev --dry-run=client -o yaml | kubectl apply -f -
+
+    - helm upgrade --install projet-gt-dev charts/my-project --namespace dev --set gateway.image.tag=$CI_COMMIT_SHORT_SHA --set users.image.tag=$CI_COMMIT_SHORT_SHA --set orders.image.tag=$CI_COMMIT_SHORT_SHA
+
+
+qa:
+  stage: qa
+  needs:
+    - dev
+  script:
+    - mkdir -p ~/.kube
+    - echo "$KUBE_CONFIG" > ~/.kube/config
+    - chmod 600 ~/.kube/config
+    - export KUBECONFIG=~/.kube/config
+
+    - kubectl create namespace qa --dry-run=client -o yaml | kubectl apply -f -
+
+    - helm upgrade --install projet-gt-qa charts/my-project --namespace qa --set gateway.image.tag=$CI_COMMIT_SHORT_SHA --set users.image.tag=$CI_COMMIT_SHORT_SHA --set orders.image.tag=$CI_COMMIT_SHORT_SHA
+
+
+staging:
+  stage: staging
+  needs:
+    - qa
+  script:
+    - mkdir -p ~/.kube
+    - echo "$KUBE_CONFIG" > ~/.kube/config
+    - chmod 600 ~/.kube/config
+    - export KUBECONFIG=~/.kube/config
+
+    - kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
+
+    - helm upgrade --install projet-gt-staging charts/my-project --namespace staging --set gateway.image.tag=$CI_COMMIT_SHORT_SHA --set users.image.tag=$CI_COMMIT_SHORT_SHA --set orders.image.tag=$CI_COMMIT_SHORT_SHA
+
+
+prod:
+  stage: prod
+  needs:
+    - staging
+  when: manual
+  script:
+    - mkdir -p ~/.kube
+    - echo "$KUBE_CONFIG" > ~/.kube/config
+    - chmod 600 ~/.kube/config
+    - export KUBECONFIG=~/.kube/config
+
+    - kubectl create namespace prod --dry-run=client -o yaml | kubectl apply -f -
+
+    - helm upgrade --install projet-gt-prod charts/my-project --namespace prod --set gateway.image.tag=$CI_COMMIT_SHORT_SHA --set users.image.tag=$CI_COMMIT_SHORT_SHA --set orders.image.tag=$CI_COMMIT_SHORT_SHA
+  only:
+    - main

@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: users
-          image: {{ .Values.users.image }}
+          image: "{{ .Values.users.image.repository }}:{{ .Values.users.image.tag }}"
           command: ["sh", "-c", "uvicorn main:app --reload --host 0.0.0.0"]
           ports:
             - containerPort: {{ .Values.users.port }}

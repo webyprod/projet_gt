@@ -1,5 +1,7 @@
 gateway:
-  image: awsfox92/k-api-gateway:latest
+  image:
+    repository: awsfox92/k-api-gateway
+    tag: latest
   port: 8000
   servicePort: 8001
   env:
@@ -7,9 +9,13 @@ gateway:
     ORDERS_SERVICE_URL: http://orders:8000
 
 users:
-  image: awsfox92/k-users:latest
+  image:
+    repository: awsfox92/k-users
+    tag: latest
   port: 8000
 
 orders:
-  image: awsfox92/k-orders:latest
+  image:
+    repository: awsfox92/k-orders
+    tag: latest
   port: 8000
